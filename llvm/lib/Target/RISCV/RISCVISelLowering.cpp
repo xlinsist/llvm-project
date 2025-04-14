@@ -376,12 +376,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setTruncStoreAction(MVT::f32, MVT::f16, Expand);
   }
 
-  /// FIXME: 尝试使'ISD::FMAXIMUMNU'、'ISD::FMINIMUMNUM'触发编译失败
-  //（error: 'FMAXIMUMNUM' is not a member of '‘'llvm::ISD'）
-  //（error: 'FMINIMUMNUM' is not a member of '‘'llvm::ISD'）
+  /// FIXME: We temporarily remove 'ISD::FMAXIMUMNU' and 'ISD::FMINIMUMNUM' here 
+  // since they will triger compilation error.
   static const unsigned ZfhminZfbfminPromoteOps[] = {
-    ISD::FMINNUM,      ISD::FMAXNUM,
-    ISD::FADD,         ISD::FSUB,
+    ISD::FMINNUM,      ISD::FMAXNUM,       // ISD::FMAXIMUMNU,
+    ISD::FADD,         ISD::FSUB,          // ISD::FMINIMUMNUM,
     ISD::FMUL,         ISD::FMA,           ISD::FDIV,
     ISD::FSQRT,        ISD::STRICT_FMA,    ISD::STRICT_FADD,
     ISD::STRICT_FSUB,  ISD::STRICT_FMUL,   ISD::STRICT_FDIV,

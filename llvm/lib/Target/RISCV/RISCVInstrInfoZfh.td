@@ -470,4 +470,3 @@ let Predicates = [HasStdExtZhinxmin, NoStdExtZhinx, IsRV32] in {
  def : Pat<(any_sint_to_fp (i32 GPR:$rs1)), (FCVT_H_S_INX (FCVT_S_W_INX $rs1, FRM_DYN), FRM_DYN)>;
  def : Pat<(any_uint_to_fp (i32 GPR:$rs1)), (FCVT_H_S_INX (FCVT_S_WU_INX $rs1, FRM_DYN), FRM_DYN)>;
  } // Predicates = [HasStdExtZhinxmin, NoStdExtZhinx, IsRV32]
- 
