@@ -110,7 +110,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   // Set up the register classes.
   addRegisterClass(XLenVT, &RISCV::GPRRegClass);
 
-  if (Subtarget.hasStdExtZhinx())
+  if (Subtarget.hasStdExtZhinx()||Subtarget.hasStdExtZhinxmin())
     addRegisterClass(MVT::f16, &RISCV::GPRF16RegClass);
   else if (Subtarget.hasStdExtZfh())
     addRegisterClass(MVT::f16, &RISCV::FPR16RegClass);
@@ -376,6 +376,48 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setTruncStoreAction(MVT::f32, MVT::f16, Expand);
   }
 
+  /// FIXME: 尝试使'ISD::FMAXIMUMNU'、'ISD::FMINIMUMNUM'触发编译失败
+  //（error: 'FMAXIMUMNUM' is not a member of '‘'llvm::ISD'）
+  //（error: 'FMINIMUMNUM' is not a member of '‘'llvm::ISD'）
+  static const unsigned ZfhminZfbfminPromoteOps[] = {
+    ISD::FMINNUM,      ISD::FMAXNUM,
+    ISD::FADD,         ISD::FSUB,
+    ISD::FMUL,         ISD::FMA,           ISD::FDIV,
+    ISD::FSQRT,        ISD::STRICT_FMA,    ISD::STRICT_FADD,
+    ISD::STRICT_FSUB,  ISD::STRICT_FMUL,   ISD::STRICT_FDIV,
+    ISD::STRICT_FSQRT, ISD::STRICT_FSETCC, ISD::STRICT_FSETCCS,
+    ISD::SETCC,        ISD::FCEIL,         ISD::FFLOOR,
+    ISD::FTRUNC,       ISD::FRINT,         ISD::FROUND,
+    ISD::FROUNDEVEN,   ISD::FCANONICALIZE};
+
+    if (Subtarget.hasStdExtZfhminOrZhinxmin()) {
+      setOperationAction(ZfhminZfbfminPromoteOps, MVT::f16, Promote);
+      setOperationAction({ISD::FMAXIMUM, ISD::FMINIMUM}, MVT::f16, Promote);
+      for (auto Op : {ISD::LROUND, ISD::LLROUND, ISD::LRINT, ISD::LLRINT,
+                      ISD::STRICT_LROUND, ISD::STRICT_LLROUND,
+                      ISD::STRICT_LRINT, ISD::STRICT_LLRINT})
+        setOperationAction(Op, MVT::f16, Custom);
+      setOperationAction(ISD::FABS, MVT::f16, Custom);
+      setOperationAction(ISD::FADD, MVT::f16, Promote);
+      setOperationAction(ISD::FNEG, MVT::f16, Custom);
+      setOperationAction(ISD::FCOPYSIGN, MVT::f16, Custom);
+      setOperationAction({ISD::FP_TO_SINT, ISD::FP_TO_UINT}, XLenVT, Custom);
+      setOperationAction({ISD::SINT_TO_FP, ISD::UINT_TO_FP}, XLenVT, Custom);
+  
+      setOperationAction(ISD::BITCAST, MVT::i16, Custom);
+  
+      setOperationAction(ISD::STRICT_FP_ROUND, MVT::f16, Legal);
+      setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f32, Legal);
+      setCondCodeAction(FPCCToExpand, MVT::f16, Expand);
+      setOperationAction(ISD::SELECT_CC, MVT::f16, Expand);
+      setOperationAction(ISD::SELECT, MVT::f16, Custom);
+      setOperationAction(ISD::BR_CC, MVT::f16, Expand);
+  
+      // We need to custom promote this.
+      if (Subtarget.is64Bit())
+        setOperationAction(ISD::FPOWI, MVT::i32, Custom);
+    }
+
   if (Subtarget.hasStdExtZfinx()) {
     setOperationAction(FPLegalNodeTypes, MVT::f32, Legal);
     setOperationAction(ISD::FCEIL, MVT::f32, Custom);
@@ -518,6 +560,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
         ISD::VP_FCEIL,       ISD::VP_FFLOOR,      ISD::VP_FROUND,
         ISD::VP_FROUNDEVEN,  ISD::VP_FCOPYSIGN,   ISD::VP_FROUNDTOZERO,
         ISD::VP_FRINT,       ISD::VP_FNEARBYINT};
+
+    static const unsigned FPRndMode[] = {
+        ISD::FCEIL, ISD::FFLOOR, ISD::FTRUNC, ISD::FRINT, ISD::FROUND,
+        ISD::FROUNDEVEN};
 
     static const unsigned IntegerVecReduceOps[] = {
         ISD::VECREDUCE_ADD,  ISD::VECREDUCE_AND,  ISD::VECREDUCE_OR,
@@ -990,7 +1036,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     //   // Custom-legalize bitcasts from fixed-length vectors to scalar types.
     setOperationAction(ISD::BITCAST, {MVT::i8, MVT::i16, MVT::i32, MVT::i64},
                         Custom);
-    if (Subtarget.hasStdExtZfh())
+    if (Subtarget.hasStdExtZfhOrZhinxmin())
       setOperationAction(ISD::BITCAST, MVT::f16, Custom);
     // if (Subtarget.hasStdExtZfinx())
     //   setOperationAction(ISD::BITCAST, MVT::f16, Custom);
@@ -1041,7 +1087,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
   if (Subtarget.hasStdExtZbkb())
     setTargetDAGCombine(ISD::BITREVERSE);
-  if (Subtarget.hasStdExtZfh())
+  if (Subtarget.hasStdExtZfhOrZhinxmin())
     setTargetDAGCombine(ISD::SIGN_EXTEND_INREG);
   if (Subtarget.hasStdExtF())
     setTargetDAGCombine({ISD::ZERO_EXTEND, ISD::FP_TO_SINT, ISD::FP_TO_UINT,
@@ -1476,7 +1522,7 @@ bool RISCVTargetLowering::isOffsetFoldingLegal(
 bool RISCVTargetLowering::isFPImmLegal(const APFloat &Imm, EVT VT,
                                        bool ForCodeSize) const {
   // FIXME: Change to Zfhmin once f16 becomes a legal type with Zfhmin.
-  if (VT == MVT::f16 && !Subtarget.hasStdExtZfh())
+  if (VT == MVT::f16 && !Subtarget.hasStdExtZfhOrZhinxmin())
     return false;
   if (VT == MVT::f32 && !Subtarget.hasStdExtF())
     return false;
@@ -1552,7 +1598,7 @@ unsigned RISCVTargetLowering::getNumRegistersForCallingConv(LLVMContext &Context
   // Use f32 to pass f16 if it is legal and Zfh is not enabled.
   // We might still end up using a GPR but that will be decided based on ABI.
   // FIXME: Change to Zfhmin once f16 becomes a legal type with Zfhmin.
-  if (VT == MVT::f16 && Subtarget.hasStdExtF() && !Subtarget.hasStdExtZfh())
+  if (VT == MVT::f16 && Subtarget.hasStdExtF() && !Subtarget.hasStdExtZfhOrZhinxmin())
     return 1;
   // FIXME: Add v2i16/v2f16 support
   // if (Subtarget.getCPU() == "ventus-gpgpu" && VT.isVector())
@@ -3609,7 +3655,7 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     SDValue Op0 = Op.getOperand(0);
     EVT Op0VT = Op0.getValueType();
     MVT XLenVT = Subtarget.getXLenVT();
-    if (VT == MVT::f16 && Op0VT == MVT::i16 && Subtarget.hasStdExtZfh()) {
+    if (VT == MVT::f16 && Op0VT == MVT::i16 && Subtarget.hasStdExtZfhOrZhinxmin()) {
       SDValue NewOp0 = DAG.getNode(ISD::ANY_EXTEND, DL, XLenVT, Op0);
       SDValue FPConv = DAG.getNode(RISCVISD::FMV_H_X, DL, MVT::f16, NewOp0);
       return FPConv;
@@ -7935,7 +7981,7 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
     SDValue Op0 = N->getOperand(0);
     EVT Op0VT = Op0.getValueType();
     MVT XLenVT = Subtarget.getXLenVT();
-    if (VT == MVT::i16 && Op0VT == MVT::f16 && Subtarget.hasStdExtZfh()) {
+    if (VT == MVT::i16 && Op0VT == MVT::f16 && Subtarget.hasStdExtZfhOrZhinxmin()) {
       SDValue FPConv = DAG.getNode(RISCVISD::FMV_X_ANYEXTH, DL, XLenVT, Op0);
       Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i16, FPConv));
     } else if (VT == MVT::i32 && Op0VT == MVT::f32 && Subtarget.is64Bit() &&

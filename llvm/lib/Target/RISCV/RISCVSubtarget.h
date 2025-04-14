@@ -226,6 +226,16 @@ public:
   bool hasLUIADDIFusion() const { return HasLUIADDIFusion; }
   bool hasForcedAtomics() const { return HasForcedAtomics; }
   bool hasOptimizedZeroStrideLoad() const { return HasOptimizedZeroStrideLoad; }
+  bool hasStdExtZhinxOrZhinxmin() const {
+    return HasStdExtZhinx || HasStdExtZhinxmin;
+  }
+  bool hasStdExtZfhOrZhinx() const { return HasStdExtZfh || HasStdExtZhinx; }
+  bool hasStdExtZfhminOrZhinxmin() const {
+    return HasStdExtZfhmin || HasStdExtZhinxmin;
+  }
+  bool hasStdExtZfhOrZhinxmin() const {
+    return HasStdExtZfh || HasStdExtZhinxmin;
+  }
   MVT getXLenVT() const { return XLenVT; }
   unsigned getXLen() const { return XLen; }
   unsigned getFLen() const {
