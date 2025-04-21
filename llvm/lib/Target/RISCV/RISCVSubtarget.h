@@ -236,6 +236,9 @@ public:
   bool hasStdExtZfhOrZhinxmin() const {
     return HasStdExtZfh || HasStdExtZhinxmin;
   }
+  bool hasStdExtZfhOrZhinxOrZhinxmin() const {
+    return HasStdExtZfh || HasStdExtZhinx || HasStdExtZhinxmin;
+  }
   MVT getXLenVT() const { return XLenVT; }
   unsigned getXLen() const { return XLen; }
   unsigned getFLen() const {

@@ -30,6 +30,12 @@ def SDT_RISCVFROUND
     : SDTypeProfile<1, 3, [SDTCisFP<0>, SDTCisSameAs<0, 1>, SDTCisSameAs<0, 2>,
                            SDTCisVT<3, XLenVT>]>;
 
+def SDT_RISCVFPCLASS
+    : SDTypeProfile<1, 1, [SDTCisVT<0, XLenVT>, SDTCisFP<1>]>;
+
+def riscv_fpclass
+    : SDNode<"RISCVISD::FPCLASS", SDT_RISCVFPCLASS>;
+
 def riscv_fround
     : SDNode<"RISCVISD::FROUND", SDT_RISCVFROUND>;
 
@@ -316,7 +322,7 @@ multiclass FPCmp_rr_m<bits<7> funct7, bits<3> funct3, string opcodestr,
     def Ext.Suffix : FPCmp_rr<funct7, funct3, opcodestr, Ext.Reg, Commutable>;
 }
 
-class PseudoFROUND<RegisterClass Ty>
+class PseudoFROUND<DAGOperand Ty>
     : Pseudo<(outs Ty:$rd), (ins Ty:$rs1, Ty:$rs2, ixlenimm:$rm),
       [(set Ty:$rd, (UniformTernaryFrag<riscv_fround> Ty:$rs1, Ty:$rs2, timm:$rm))]> {
   let hasSideEffects = 0;
@@ -541,15 +547,29 @@ def fpimm0    : PatLeaf<(fpimm), [{ return N->isExactlyValue(+0.0); }]>;
 def fpimmneg0 : PatLeaf<(fpimm), [{ return N->isExactlyValue(-0.0); }]>;
 
 /// Generic pattern classes
-class PatSetCC<RegisterClass Ty, SDPatternOperator OpNode, CondCode Cond, RVInst Inst>
+class PatSetCC<DAGOperand Ty, SDPatternOperator OpNode, CondCode Cond, RVInst Inst>
     : Pat<(OpNode Ty:$rs1, Ty:$rs2, Cond), (Inst $rs1, $rs2)>;
+multiclass PatSetCC_m<SDPatternOperator OpNode, CondCode Cond,
+                      RVInst Inst, list<ExtInfo_r> Exts> {
+  foreach Ext = Exts in
+    let Predicates = Ext.Predicates in
+    def Ext.Suffix : PatSetCC<Ext.Reg, OpNode, Cond,
+                              !cast<RVInst>(Inst#Ext.Suffix)>;
+}
 
 class PatFprFpr<SDPatternOperator OpNode, RVInstR Inst,
-                RegisterClass RegTy>
+                DAGOperand RegTy>
     : Pat<(OpNode RegTy:$rs1, RegTy:$rs2), (Inst $rs1, $rs2)>;
+multiclass PatFprFpr_m<SDPatternOperator OpNode, RVInstR Inst,
+                       list<ExtInfo_r> Exts> {
+  foreach Ext = Exts in
+    let Predicates = Ext.Predicates in
+    def Ext.Suffix : PatFprFpr<OpNode, !cast<RVInstR>(Inst#Ext.Suffix),
+                               Ext.Reg>;
+}
 
 class PatFprFprDynFrm<SDPatternOperator OpNode, RVInstRFrm Inst,
-                      RegisterClass RegTy>
+                      DAGOperand RegTy>
     : Pat<(OpNode RegTy:$rs1, RegTy:$rs2), (Inst $rs1, $rs2, 0b111)>;
 
 let Predicates = [HasStdExtZfinx] in {
