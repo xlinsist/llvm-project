@@ -1,5 +1,7 @@
 ; RUN: llc -mtriple=riscv32 -mcpu=ventus-gpgpu -mattr=+zhinx -verify-machineinstrs -O1 < %s \
 ; RUN:   | FileCheck -check-prefix=VENTUS %s
+; RUN: llc -mtriple=riscv32 -mcpu=ventus-gpgpu -mattr=+zhinxmin -verify-machineinstrs -O1 < %s \
+; RUN:   | FileCheck -check-prefix=VENTUS %s
 
 
 define dso_local ventus_kernel void @fadd(half noundef %c, half noundef %d, ptr addrspace(1) nocapture noundef writeonly align 4 %result)  {
@@ -68,7 +70,6 @@ entry:
 
 define dso_local ventus_kernel void @fmadd(half noundef %a, half noundef %b, half noundef %c, ptr addrspace(1) nocapture noundef writeonly align 4 %result)  {
 ; VENTUS-LABEL: fmadd:
-; VENTUS:       # %bb.0: # %entry
 ; VENTUS:       # %bb.0: # %entry
 ; VENTUS-NEXT:    lh t0, 0(a0)
 ; VENTUS-NEXT:    addi	 t1, a0, 8
