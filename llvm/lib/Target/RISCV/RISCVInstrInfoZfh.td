@@ -83,6 +83,13 @@ defvar FHINXmin = [FHmin, FH_INXmin];
 defvar DHINXmin = [DHmin, DH_INXmin];
 defvar HDINXmin = [HDmin, HD_INXmin];
 
+defvar FRM_RNE = 0b000;
+defvar FRM_RTZ = 0b001;
+defvar FRM_RDN = 0b010;
+defvar FRM_RUP = 0b011;
+defvar FRM_RMM = 0b100;
+defvar FRM_DYN = 0b111;
+
 //===----------------------------------------------------------------------===//
 // Instructions
 //===----------------------------------------------------------------------===//
@@ -245,7 +252,12 @@ def : InstAlias<"fgt.h $rd, $rs, $rt",
                 (FLT_H_INX GPR:$rd, FPR16INX:$rt, FPR16INX:$rs), 0>;
 def : InstAlias<"fge.h $rd, $rs, $rt",
                 (FLE_H_INX GPR:$rd, FPR16INX:$rt, FPR16INX:$rs), 0>;
-} // Predicates = [HasStdExtZhinx]
+
+let usesCustomInserter = 1 in {
+def PseudoQuietFLE_H_INX : PseudoQuietFCMP<FPR16INX>;
+def PseudoQuietFLT_H_INX : PseudoQuietFCMP<FPR16INX>;
+}
+} // Predicates = [HasStdExtZhinxOrZhinxmin]
 
 //===----------------------------------------------------------------------===//
 // Pseudo-instructions and codegen patterns
@@ -299,25 +311,74 @@ def : Pat<(any_fma (fneg FPR16:$rs1), FPR16:$rs2, (fneg FPR16:$rs3)),
 // fnmadd: -(rs1 * rs2 + rs3) (the nsz flag on the FMA)
 def : Pat<(fneg (any_fma_nsz FPR16:$rs1, FPR16:$rs2, FPR16:$rs3)),
           (FNMADD_H FPR16:$rs1, FPR16:$rs2, FPR16:$rs3, 0b111)>;
+} // Predicates = [HasStdExtZfh]
+
+let Predicates = [HasStdExtZhinx] in {
+
+/// Float conversion operations
+
+// [u]int32<->float conversion patterns must be gated on IsRV32 or IsRV64, so
+// are defined later.
+
+/// Float arithmetic operations
+
+def : PatFprFprDynFrm<any_fadd, FADD_H_INX, FPR16INX>;
+def : PatFprFprDynFrm<any_fsub, FSUB_H_INX, FPR16INX>;
+def : PatFprFprDynFrm<any_fmul, FMUL_H_INX, FPR16INX>;
+def : PatFprFprDynFrm<any_fdiv, FDIV_H_INX, FPR16INX>;
+
+def : Pat<(any_fsqrt FPR16INX:$rs1), (FSQRT_H_INX FPR16INX:$rs1, FRM_DYN)>;
+
+def : Pat<(fneg FPR16INX:$rs1), (FSGNJN_H_INX $rs1, $rs1)>;
+def : Pat<(fabs FPR16INX:$rs1), (FSGNJX_H_INX $rs1, $rs1)>;
+
+def : Pat<(riscv_fpclass FPR16INX:$rs1), (FCLASS_H_INX $rs1)>;
+
+def : PatFprFpr<fcopysign, FSGNJ_H_INX, FPR16INX>;
+def : Pat<(fcopysign FPR16INX:$rs1, (fneg FPR16INX:$rs2)), (FSGNJN_H_INX $rs1, $rs2)>;
+def : Pat<(fcopysign FPR16INX:$rs1, FPR32INX:$rs2),
+          (FSGNJ_H_INX $rs1, (FCVT_H_S_INX $rs2, FRM_DYN))>;
+
+// fmadd: rs1 * rs2 + rs3
+def : Pat<(any_fma FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3),
+          (FMADD_H_INX $rs1, $rs2, $rs3, FRM_DYN)>;
+
+// fmsub: rs1 * rs2 - rs3
+def : Pat<(any_fma FPR16INX:$rs1, FPR16INX:$rs2, (fneg FPR16INX:$rs3)),
+          (FMSUB_H_INX FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3, FRM_DYN)>;
+
+// fnmsub: -rs1 * rs2 + rs3
+def : Pat<(any_fma (fneg FPR16INX:$rs1), FPR16INX:$rs2, FPR16INX:$rs3),
+          (FNMSUB_H_INX FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3, FRM_DYN)>;
+
+// fnmadd: -rs1 * rs2 - rs3
+def : Pat<(any_fma (fneg FPR16INX:$rs1), FPR16INX:$rs2, (fneg FPR16INX:$rs3)),
+          (FNMADD_H_INX FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3, FRM_DYN)>;
+
+// fnmadd: -(rs1 * rs2 + rs3) (the nsz flag on the FMA)
+def : Pat<(fneg (any_fma_nsz FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3)),
+          (FNMADD_H_INX FPR16INX:$rs1, FPR16INX:$rs2, FPR16INX:$rs3, FRM_DYN)>;
+} // Predicates = [HasStdExtZhinx]
 
 // The ratified 20191213 ISA spec defines fmin and fmax in a way that matches
 // LLVM's fminnum and fmaxnum
 // <https://github.com/riscv/riscv-isa-manual/commit/cd20cee7efd9bac7c5aa127ec3b451749d2b3cce>.
-def : PatFprFpr<fminnum, FMIN_H, FPR16>;
-def : PatFprFpr<fmaxnum, FMAX_H, FPR16>;
+defm : PatFprFpr_m<fminnum, FMIN_H, HINX>;
+defm : PatFprFpr_m<fmaxnum, FMAX_H, HINX>;
 
 /// Setcc
 // FIXME: SETEQ/SETLT/SETLE imply nonans, can we pick better instructions for
 // strict versions of those.
 
 // Match non-signaling FEQ_D
-def : PatSetCC<FPR16, any_fsetcc, SETEQ, FEQ_H>;
-def : PatSetCC<FPR16, any_fsetcc, SETOEQ, FEQ_H>;
-def : PatSetCC<FPR16, strict_fsetcc, SETLT, PseudoQuietFLT_H>;
-def : PatSetCC<FPR16, strict_fsetcc, SETOLT, PseudoQuietFLT_H>;
-def : PatSetCC<FPR16, strict_fsetcc, SETLE, PseudoQuietFLE_H>;
-def : PatSetCC<FPR16, strict_fsetcc, SETOLE, PseudoQuietFLE_H>;
+defm : PatSetCC_m<any_fsetcc,    SETEQ,  FEQ_H,            HINX>;
+defm : PatSetCC_m<any_fsetcc,    SETOEQ, FEQ_H,            HINX>;
+defm : PatSetCC_m<strict_fsetcc, SETLT,  PseudoQuietFLT_H, HINX>;
+defm : PatSetCC_m<strict_fsetcc, SETOLT, PseudoQuietFLT_H, HINX>;
+defm : PatSetCC_m<strict_fsetcc, SETLE,  PseudoQuietFLE_H, HINX>;
+defm : PatSetCC_m<strict_fsetcc, SETOLE, PseudoQuietFLE_H, HINX>;
 
+let Predicates = [HasStdExtZfh] in {
 // Match signaling FEQ_H
 def : Pat<(strict_fsetccs FPR16:$rs1, FPR16:$rs2, SETEQ),
           (AND (FLE_H $rs1, $rs2),
@@ -330,16 +391,39 @@ def : Pat<(strict_fsetccs FPR16:$rs1, FPR16:$rs1, SETEQ),
           (FLE_H $rs1, $rs1)>;
 def : Pat<(strict_fsetccs FPR16:$rs1, FPR16:$rs1, SETOEQ),
           (FLE_H $rs1, $rs1)>;
+} // Predicates = [HasStdExtZfh]
 
-def : PatSetCC<FPR16, any_fsetccs, SETLT, FLT_H>;
-def : PatSetCC<FPR16, any_fsetccs, SETOLT, FLT_H>;
-def : PatSetCC<FPR16, any_fsetccs, SETLE, FLE_H>;
-def : PatSetCC<FPR16, any_fsetccs, SETOLE, FLE_H>;
+let Predicates = [HasStdExtZhinx] in {
+// Match signaling FEQ_H
+def : Pat<(strict_fsetccs FPR16INX:$rs1, FPR16INX:$rs2, SETEQ),
+          (AND (FLE_H_INX $rs1, $rs2),
+               (FLE_H_INX $rs2, $rs1))>;
+def : Pat<(strict_fsetccs FPR16INX:$rs1, FPR16INX:$rs2, SETOEQ),
+          (AND (FLE_H_INX $rs1, $rs2),
+               (FLE_H_INX $rs2, $rs1))>;
+// If both operands are the same, use a single FLE.
+def : Pat<(strict_fsetccs FPR16INX:$rs1, FPR16INX:$rs1, SETEQ),
+          (FLE_H_INX $rs1, $rs1)>;
+def : Pat<(strict_fsetccs FPR16INX:$rs1, FPR16INX:$rs1, SETOEQ),
+          (FLE_H_INX $rs1, $rs1)>;
+} // Predicates = [HasStdExtZhinx]
 
+defm : PatSetCC_m<any_fsetccs, SETLT,  FLT_H, HINX>;
+defm : PatSetCC_m<any_fsetccs, SETOLT, FLT_H, HINX>;
+defm : PatSetCC_m<any_fsetccs, SETLE,  FLE_H, HINX>;
+defm : PatSetCC_m<any_fsetccs, SETOLE, FLE_H, HINX>;
+
+let Predicates = [HasStdExtZfh] in {
 defm Select_FPR16 : SelectCC_GPR_rrirr<FPR16>;
 
 def PseudoFROUND_H : PseudoFROUND<FPR16>;
 } // Predicates = [HasStdExtZfh]
+
+let Predicates = [HasStdExtZhinx] in {
+defm Select_FPR16INX : SelectCC_GPR_rrirr<FPR16INX>;
+
+def PseudoFROUND_H_INX : PseudoFROUND<FPR16INX>;
+} // Predicates = [HasStdExtZhinx]
 
 let Predicates = [HasStdExtZfhOrZfhmin] in {
 /// Loads
@@ -349,7 +433,18 @@ defm : UniformLdPat<load, FLH, f16>;
 /// Stores
 
 defm : UniformStPat<store, FSH, FPR16, f16>;
+} // Predicates = [HasStdExtZfhOrZfhmin]
 
+let Predicates = [HasStdExtZhinxOrZhinxmin] in {
+/// Loads
+def : Pat<(f16 (load GPR:$rs1)), (COPY_TO_REGCLASS (LH GPR:$rs1, 0), GPRF16)>;
+
+/// Stores
+def : Pat<(store (f16 FPR16INX:$rs2), GPR:$rs1),
+          (SH (COPY_TO_REGCLASS FPR16INX:$rs2, GPR), GPR:$rs1, 0)>;
+} // Predicates = [HasStdExtZhinxOrZhinxmin]
+
+let Predicates = [HasStdExtZfhOrZfhmin] in {
 /// Float conversion operations
 
 // f32 -> f16, f16 -> f32
@@ -361,6 +456,21 @@ def : Pat<(riscv_fmv_h_x GPR:$src), (FMV_H_X GPR:$src)>;
 def : Pat<(riscv_fmv_x_anyexth FPR16:$src), (FMV_X_H FPR16:$src)>;
 def : Pat<(riscv_fmv_x_signexth FPR16:$src), (FMV_X_H FPR16:$src)>;
 } // Predicates = [HasStdExtZfhOrZfhmin]
+
+ let Predicates = [HasStdExtZhinxOrZhinxmin] in {
+ /// Float conversion operations
+ 
+ // f32 -> f16, f16 -> f32
+ def : Pat<(any_fpround FPR32INX:$rs1), (FCVT_H_S_INX FPR32INX:$rs1, FRM_DYN)>;
+ def : Pat<(any_fpextend FPR16INX:$rs1), (FCVT_S_H_INX FPR16INX:$rs1)>;
+ 
+ // Moves (no conversion)
+ def : Pat<(riscv_fmv_h_x GPR:$src), (COPY_TO_REGCLASS GPR:$src, GPR)>;
+ def : Pat<(riscv_fmv_x_anyexth FPR16INX:$src), (COPY_TO_REGCLASS FPR16INX:$src, GPR)>;
+ def : Pat<(riscv_fmv_x_signexth FPR16INX:$src), (COPY_TO_REGCLASS FPR16INX:$src, GPR)>;
+ 
+ def : Pat<(fcopysign FPR32INX:$rs1, FPR16INX:$rs2), (FSGNJ_S_INX $rs1, (FCVT_S_H_INX $rs2))>;
+ } // Predicates = [HasStdExtZhinxOrZhinxmin]
 
 let Predicates = [HasStdExtZfh, IsRV32] in {
 // half->[u]int. Round-to-zero must be used.
@@ -381,6 +491,26 @@ def : Pat<(i32 (any_lround FPR16:$rs1)), (FCVT_W_H $rs1, 0b100)>;
 def : Pat<(any_sint_to_fp (i32 GPR:$rs1)), (FCVT_H_W $rs1, 0b111)>;
 def : Pat<(any_uint_to_fp (i32 GPR:$rs1)), (FCVT_H_WU $rs1, 0b111)>;
 } // Predicates = [HasStdExtZfh, IsRV32]
+
+let Predicates = [HasStdExtZhinx, IsRV32] in {
+// half->[u]int. Round-to-zero must be used.
+def : Pat<(i32 (any_fp_to_sint FPR16INX:$rs1)), (FCVT_W_H_INX $rs1, 0b001)>;
+def : Pat<(i32 (any_fp_to_uint FPR16INX:$rs1)), (FCVT_WU_H_INX $rs1, 0b001)>;
+
+// Saturating float->[u]int32.
+def : Pat<(i32 (riscv_fcvt_x FPR16INX:$rs1, timm:$frm)), (FCVT_W_H_INX $rs1, timm:$frm)>;
+def : Pat<(i32 (riscv_fcvt_xu FPR16INX:$rs1, timm:$frm)), (FCVT_WU_H_INX $rs1, timm:$frm)>;
+
+// half->int32 with current rounding mode.
+def : Pat<(i32 (any_lrint FPR16INX:$rs1)), (FCVT_W_H_INX $rs1, FRM_DYN)>;
+
+// half->int32 rounded to nearest with ties rounded away from zero.
+def : Pat<(i32 (any_lround FPR16INX:$rs1)), (FCVT_W_H_INX $rs1, FRM_RMM)>;
+
+// [u]int->half. Match GCC and default to using dynamic rounding mode.
+def : Pat<(any_sint_to_fp (i32 GPR:$rs1)), (FCVT_H_W_INX $rs1, FRM_DYN)>;
+def : Pat<(any_uint_to_fp (i32 GPR:$rs1)), (FCVT_H_WU_INX $rs1, FRM_DYN)>;
+} // Predicates = [HasStdExtZhinx, IsRV32]
 
 let Predicates = [HasStdExtZfh, IsRV64] in {
 // Use target specific isd nodes to help us remember the result is sign
@@ -423,3 +553,19 @@ def : Pat<(fcopysign FPR16:$rs1, FPR64:$rs2),
           (FSGNJ_H $rs1, (FCVT_H_D $rs2, 0b111))>;
 def : Pat<(fcopysign FPR64:$rs1, FPR16:$rs2), (FSGNJ_D $rs1, (FCVT_D_H $rs2))>;
 } // Predicates = [HasStdExtZfhOrZfhmin, HasStdExtD]
+
+let Predicates = [HasStdExtZhinxmin, NoStdExtZhinx, IsRV32] in {
+ // half->[u]int. Round-to-zero must be used.
+ def : Pat<(i32 (any_fp_to_sint FPR16INX:$rs1)), (FCVT_W_S_INX (FCVT_S_H_INX $rs1), FRM_RTZ)>;
+ def : Pat<(i32 (any_fp_to_uint FPR16INX:$rs1)), (FCVT_WU_S_INX (FCVT_S_H_INX $rs1), FRM_RTZ)>;
+ 
+ // half->int32 with current rounding mode.
+ def : Pat<(i32 (any_lrint FPR16INX:$rs1)), (FCVT_W_S_INX (FCVT_S_H_INX $rs1), FRM_DYN)>;
+ 
+ // half->int32 rounded to nearest with ties rounded away from zero.
+ def : Pat<(i32 (any_lround FPR16INX:$rs1)), (FCVT_W_S_INX (FCVT_S_H_INX $rs1), FRM_RMM)>;
+ 
+ // [u]int->half. Match GCC and default to using dynamic rounding mode.
+ def : Pat<(any_sint_to_fp (i32 GPR:$rs1)), (FCVT_H_S_INX (FCVT_S_W_INX $rs1, FRM_DYN), FRM_DYN)>;
+ def : Pat<(any_uint_to_fp (i32 GPR:$rs1)), (FCVT_H_S_INX (FCVT_S_WU_INX $rs1, FRM_DYN), FRM_DYN)>;
+ } // Predicates = [HasStdExtZhinxmin, NoStdExtZhinx, IsRV32]

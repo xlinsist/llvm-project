@@ -118,6 +118,8 @@ def HasStdExtZhinx : Predicate<"Subtarget->hasStdExtZhinx()">,
                                AssemblerPredicate<(all_of FeatureStdExtZhinx),
                                "'Zhinx' (Half Float in Integer)">;
 
+def NoStdExtZhinx : Predicate<"!Subtarget->hasStdExtZhinx()">;
+
 def HasStdExtZhinxOrZhinxmin
     : Predicate<"Subtarget->hasStdExtZhinx() || Subtarget->hasStdExtZhinxmin()">,
                 AssemblerPredicate<(any_of FeatureStdExtZhinx, FeatureStdExtZhinxmin),
