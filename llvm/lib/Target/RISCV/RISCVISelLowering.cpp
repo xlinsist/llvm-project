@@ -1061,7 +1061,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
           if (!isTypeLegal(F32VecVT))
             continue;
           // Custom split nxv32[b]f16 since nxv32[b]f32 is not legal.
-          if (getLMUL(VT) == RISCVII::VLMUL::LMUL_8) {
+          if (getLMUL(VT) == RISCVII::LMUL_8) {
             setOperationAction(ZvfhminZvfbfminPromoteOps, VT, Custom);
             setOperationAction(ZvfhminZvfbfminPromoteVPOps, VT, Custom);
           } else {
