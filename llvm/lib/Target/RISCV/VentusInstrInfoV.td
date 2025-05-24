@@ -795,6 +795,7 @@ def VLHI12 : VENTUS_VLI12<0b001, "vlh12">;
 def VLBI12 : VENTUS_VLI12<0b000, "vlb12">;
 def VLHUI12 : VENTUS_VLI12<0b101, "vlhu12">;
 def VLBUI12 : VENTUS_VLI12<0b100, "vlbu12">;
+def VLE16_V : VENTUS_VL<0b001, "vle16">;
 }
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in {
@@ -805,6 +806,7 @@ def VSB : VENTUS_VS<0b000, "vsb">;
 def VSWI12 : VENTUS_VSI12<0b110, "vsw12">;
 def VSHI12 : VENTUS_VSI12<0b011, "vsh12">;
 def VSBI12 : VENTUS_VSI12<0b111, "vsb12">;
+def VSE16_V : VENTUS_VS<0b001, "vse16">;
 }
 
 let Predicates = [HasVInstructions] in {
@@ -1508,3 +1510,33 @@ let Predicates = [HasStdExtZfinx] in {
 def : Pat<(f32 (bitconvert (i32 GPR:$src))), (VMV_V_X GPR:$src)>;
 // def : Pat<(i32 (bitconvert GPRF32:$src)), (VFMV_V_F GPRF32:$src)>;
 } // Predicates = [HasStdExtZfinx]
+
+//===----------------------------------------------------------------------===//
+// zvfhmin: half-precision vector load/store and conversion patterns
+//===----------------------------------------------------------------------===//
+
+multiclass ZvfhminPatterns<list<int> VLens> {
+  foreach vlen = VLens in {
+    defvar VTyHalf = !cast<VectorType<Half, vlen>>("v" # vlen # "half");
+    defvar VTyF32  = !cast<VectorType<f32, vlen>>("v" # vlen # "f32");
+
+    // half load
+    def : Pat<(VTyHalf (load VGPR:$rs1)),
+              (VLE16_V VGPR:$rs1, 0)>;
+
+    // half store
+    def : Pat<(store (VTyHalf VGPR:$vs3), VGPR:$rs1),
+              (VSE16_V VGPR:$vs3, VGPR:$rs1, 0)>;
+
+    // fp16 -> fp32
+    def : Pat<(VTyF32 (fpextend (VTyHalf VGPR:$vs2))),
+              (VFWCVT_F_F_V VGPR:$vs2)>;
+
+    // fp32 -> fp16
+    def : Pat<(VTyHalf (fptrunc (VTyF32 VGPR:$vs2))),
+              (VFNCVT_F_F_W VGPR:$vs2)>;
+  }
+}
+
+// Support 8/16/32 lane half vectors
+defm : ZvfhminPatterns<[8, 16, 32]>;
