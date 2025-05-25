@@ -518,9 +518,9 @@ def Reg32Types : RegisterTypes<[i32, f32, v2i16, v2f16]>;
 
 // VGPR 32-bit registers class
 def VGPR : RVRegisterClass<"RISCV",
-                            !listconcat(Reg32Types.types, Reg16Types.types),
-                            32,
-                            (add (sequence "V%u", 0, 255))> {
+  [i32, f32, v2i16, v2f16, i16, f16, v8f16, v16f16, v32f16, v8f32, v16f32, v32f32],
+  32,
+  (add (sequence "V%u", 0, 255))> {
   let Size = 32;
   let IsVGPR = 1;
 }

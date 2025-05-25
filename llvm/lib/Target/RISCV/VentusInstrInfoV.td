@@ -1515,28 +1515,23 @@ def : Pat<(f32 (bitconvert (i32 GPR:$src))), (VMV_V_X GPR:$src)>;
 // zvfhmin: half-precision vector load/store and conversion patterns
 //===----------------------------------------------------------------------===//
 
-multiclass ZvfhminPatterns<list<int> VLens> {
-  foreach vlen = VLens in {
-    defvar VTyHalf = !cast<VectorType<Half, vlen>>("v" # vlen # "half");
-    defvar VTyF32  = !cast<VectorType<f32, vlen>>("v" # vlen # "f32");
+multiclass ZvfhminPatterns {
+  // 8 lanes
+  def : Pat<(v8f16 (load VGPR:$rs1)), (VLE16_V VGPR:$rs1, 0)>;
+  def : Pat<(store (v8f16 VGPR:$vs3), VGPR:$rs1), (VSE16_V VGPR:$vs3, VGPR:$rs1, 0)>;
+  def : Pat<(v8f32 (fpextend (v8f16 VGPR:$vs2))), (VFWCVT_F_F_V VGPR:$vs2)>;
+  def : Pat<(v8f16 (fpround (v8f32 VGPR:$vs2))), (VFNCVT_F_F_W VGPR:$vs2)>;
 
-    // half load
-    def : Pat<(VTyHalf (load VGPR:$rs1)),
-              (VLE16_V VGPR:$rs1, 0)>;
+  // 16 lanes
+  def : Pat<(v16f16 (load VGPR:$rs1)), (VLE16_V VGPR:$rs1, 0)>;
+  def : Pat<(store (v16f16 VGPR:$vs3), VGPR:$rs1), (VSE16_V VGPR:$vs3, VGPR:$rs1, 0)>;
+  def : Pat<(v16f32 (fpextend (v16f16 VGPR:$vs2))), (VFWCVT_F_F_V VGPR:$vs2)>;
+  def : Pat<(v16f16 (fpround (v16f32 VGPR:$vs2))), (VFNCVT_F_F_W VGPR:$vs2)>;
 
-    // half store
-    def : Pat<(store (VTyHalf VGPR:$vs3), VGPR:$rs1),
-              (VSE16_V VGPR:$vs3, VGPR:$rs1, 0)>;
-
-    // fp16 -> fp32
-    def : Pat<(VTyF32 (fpextend (VTyHalf VGPR:$vs2))),
-              (VFWCVT_F_F_V VGPR:$vs2)>;
-
-    // fp32 -> fp16
-    def : Pat<(VTyHalf (fptrunc (VTyF32 VGPR:$vs2))),
-              (VFNCVT_F_F_W VGPR:$vs2)>;
-  }
+  // 32 lanes
+  def : Pat<(v32f16 (load VGPR:$rs1)), (VLE16_V VGPR:$rs1, 0)>;
+  def : Pat<(store (v32f16 VGPR:$vs3), VGPR:$rs1), (VSE16_V VGPR:$vs3, VGPR:$rs1, 0)>;
+  def : Pat<(v32f32 (fpextend (v32f16 VGPR:$vs2))), (VFWCVT_F_F_V VGPR:$vs2)>;
+  def : Pat<(v32f16 (fpround (v32f32 VGPR:$vs2))), (VFNCVT_F_F_W VGPR:$vs2)>;
 }
-
-// Support 8/16/32 lane half vectors
-defm : ZvfhminPatterns<[8, 16, 32]>;
+defm : ZvfhminPatterns;
