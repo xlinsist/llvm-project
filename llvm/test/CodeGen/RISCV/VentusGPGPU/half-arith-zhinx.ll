@@ -3,9 +3,6 @@
 ; RUN: llc -mtriple=riscv32 -mcpu=ventus-gpgpu -mattr=+zhinx -verify-machineinstrs -O1 < %s \
 ; RUN:   | FileCheck -check-prefix=VENTUS-ZHINX %s
 
-;-----------------------------------------------------------------------------
-; fadd: 半精度浮点加法
-;-----------------------------------------------------------------------------
 define dso_local ventus_kernel void @fadd(half noundef %c, half noundef %d, ptr addrspace(1) nocapture noundef writeonly align 4 %result) {
 ; VENTUS-ZHINXMIN-LABEL: fadd:
 ; VENTUS-ZHINXMIN:       # %bb.0: # %entry
@@ -36,9 +33,6 @@ entry:
   ret void
 }
 
-;-----------------------------------------------------------------------------
-; fsub: 半精度浮点减法
-;-----------------------------------------------------------------------------
 define dso_local ventus_kernel void @fsub(half noundef %c, half noundef %d, ptr addrspace(1) nocapture noundef writeonly align 4 %result) {
 ; VENTUS-ZHINXMIN-LABEL: fsub:
 ; VENTUS-ZHINXMIN:       # %bb.0: # %entry
@@ -68,9 +62,6 @@ entry:
   ret void
 }
 
-;-----------------------------------------------------------------------------
-; fmul: 半精度浮点乘法
-;-----------------------------------------------------------------------------
 define dso_local ventus_kernel void @fmul(half noundef %c, half noundef %d, ptr addrspace(1) nocapture noundef writeonly align 4 %result) {
 ; VENTUS-ZHINXMIN-LABEL: fmul:
 ; VENTUS-ZHINXMIN:       # %bb.0: # %entry
@@ -100,9 +91,6 @@ entry:
   ret void
 }
 
-;-----------------------------------------------------------------------------
-; fdiv: 半精度浮点除法
-;-----------------------------------------------------------------------------
 define dso_local ventus_kernel void @fdiv(half noundef %c, half noundef %d, ptr addrspace(1) nocapture noundef writeonly align 4 %result) {
 ; VENTUS-ZHINXMIN-LABEL: fdiv:
 ; VENTUS-ZHINXMIN:       # %bb.0: # %entry
@@ -132,9 +120,6 @@ entry:
   ret void
 }
 
-;-----------------------------------------------------------------------------
-; fmadd: 半精度浮点乘加
-;-----------------------------------------------------------------------------
 define dso_local ventus_kernel void @fmadd(half noundef %a, half noundef %b, half noundef %c, ptr addrspace(1) nocapture noundef writeonly align 4 %result) {
 ; VENTUS-ZHINXMIN-LABEL: fmadd:
 ; VENTUS-ZHINXMIN:       # %bb.0: # %entry
