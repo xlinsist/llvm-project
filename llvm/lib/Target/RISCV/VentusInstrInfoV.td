@@ -795,6 +795,7 @@ def VLHI12 : VENTUS_VLI12<0b001, "vlh12">;
 def VLBI12 : VENTUS_VLI12<0b000, "vlb12">;
 def VLHUI12 : VENTUS_VLI12<0b101, "vlhu12">;
 def VLBUI12 : VENTUS_VLI12<0b100, "vlbu12">;
+def VLE16_V : VENTUS_VLI12<0b110, "vle16">;
 }
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in {
@@ -805,6 +806,7 @@ def VSB : VENTUS_VS<0b000, "vsb">;
 def VSWI12 : VENTUS_VSI12<0b110, "vsw12">;
 def VSHI12 : VENTUS_VSI12<0b011, "vsh12">;
 def VSBI12 : VENTUS_VSI12<0b111, "vsb12">;
+def VSE16_V : VENTUS_VSI12<0b110, "vse16">;
 }
 
 let Predicates = [HasVInstructions] in {
@@ -1508,3 +1510,21 @@ let Predicates = [HasStdExtZfinx] in {
 def : Pat<(f32 (bitconvert (i32 GPR:$src))), (VMV_V_X GPR:$src)>;
 // def : Pat<(i32 (bitconvert GPRF32:$src)), (VFMV_V_F GPRF32:$src)>;
 } // Predicates = [HasStdExtZfinx]
+
+//===----------------------------------------------------------------------===//
+// zvfhmin: half-precision vector load/store and conversion patterns
+//===----------------------------------------------------------------------===//
+multiclass ZvfhminPatterns {
+  // 8 lanes
+  def : Pat<(v8f16 (load VReg_128:$rs1)), (VLE16_V VReg_128:$rs1, 0)>;
+  def : Pat<(store (v8f16 VReg_128:$vs3), VReg_128:$rs1), (VSE16_V VReg_128:$vs3, VReg_128:$rs1, 0)>;
+  def : Pat<(v8f32 (fpextend (v8f16 VReg_128:$vs2))), (VFWCVT_F_F_V VReg_256:$vs2)>;
+  def : Pat<(v8f16 (fpround (v8f32 VReg_256:$vs2))), (VFNCVT_F_F_W VReg_128:$vs2)>;
+
+  // 16 lanes
+  def : Pat<(v16f16 (load VReg_256:$rs1)), (VLE16_V VReg_256:$rs1, 0)>;
+  def : Pat<(store (v16f16 VReg_256:$vs3), VReg_256:$rs1), (VSE16_V VReg_256:$vs3, VReg_256:$rs1, 0)>;
+  def : Pat<(v16f32 (fpextend (v16f16 VReg_256:$vs2))), (VFWCVT_F_F_V VReg_512:$vs2)>;
+  def : Pat<(v16f16 (fpround (v16f32 VReg_512:$vs2))), (VFNCVT_F_F_W VReg_256:$vs2)>;
+}
+defm : ZvfhminPatterns;
