@@ -518,7 +518,7 @@ def Reg32Types : RegisterTypes<[i32, f32, v2i16, v2f16]>;
 
 // VGPR 32-bit registers class
 def VGPR : RVRegisterClass<"RISCV",
-  [i32, f32, v2i16, v2f16, i16, f16, v8f16, v16f16, v32f16, v8f32, v16f32, v32f32],
+  !listconcat(Reg32Types.types, Reg16Types.types),
   32,
   (add (sequence "V%u", 0, 255))> {
   let Size = 32;
@@ -540,7 +540,7 @@ def VGPR_256 : VentusRegisterTuples<getSubRegs<8>.ret, VGPR, 255, 1, 8, "v">;
 // VGPR 512-bit registers
 def VGPR_512 : VentusRegisterTuples<getSubRegs<16>.ret, VGPR, 255, 1, 16, "v">;
 
-// VGPR 64 ~ 512 registers
+// VGPR 64 ~ 512 registers class
 def VReg_64  : RVRegisterClass<"RISCV", [i64, f64, v2i32, v2f32, v4f16, v4i16], 64, (add VGPR_64)>;
 def VReg_96  : RVRegisterClass<"RISCV", [v3i32, v3f32], 64, (add VGPR_96)>;
 def VReg_128 : RVRegisterClass<"RISCV", [v4i32, v4f32, v8i16, v8f16], 64, (add VGPR_128)>;
